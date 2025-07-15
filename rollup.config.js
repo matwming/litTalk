@@ -10,9 +10,9 @@ import resolve from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
 
 export default {
-  input: 'my-element.js',
+  input: 'dist/lit-talk.js',
   output: {
-    file: 'my-element.bundled.js',
+    file: 'lit-talk.bundle.js',
     format: 'esm',
   },
   onwarn(warning) {
@@ -22,7 +22,9 @@ export default {
   },
   plugins: [
     replace({preventAssignment: false, 'Reflect.decorate': 'undefined'}),
-    resolve(),
+    resolve({
+      browser: true,
+    }),
     /**
      * This minification setup serves the static site generation.
      * For bundling and minification, check the README.md file.
