@@ -15,7 +15,9 @@ export const commentBoxTemplate = (ctx: any) => {
       <div class="comment-box">
         <textarea
           class="comment-textarea"
-          placeholder="Leave a comment"
+          placeholder="${!ctx.githubUser?.login
+            ? 'Please Login with Github'
+            : 'Leave a comment'}"
           .value=${ctx.commentText}
           @input=${ctx._handleCommentInput}
           ?disabled=${!ctx.githubUser?.login}
@@ -41,10 +43,9 @@ export const commentBoxTemplate = (ctx: any) => {
                 >
                   Login with Github
                 </button>`
-              : html``}
-            <button class="btn btn-comment" @click=${ctx._postComment}>
-              Comment
-            </button>
+              : html`<button class="btn btn-comment" @click=${ctx._postComment}>
+                  Comment
+                </button>`}
           </div>
         </div>
       </div>

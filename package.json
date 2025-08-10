@@ -1,7 +1,8 @@
 {
   "name": "lit-talk",
   "private": false,
-  "version": "1.0.6",
+  "version": "1.0.7",
+  "homepage": "https://github.com/matwming/lit-talk",
   "description": "A lightweight GitHub-powered comment system for any JavaScript framework. Built with Lit web components.",
   "main": "./dist/lit-talk.js",
   "module": "./dist/lit-talk.js",

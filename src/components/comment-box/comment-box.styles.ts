@@ -85,10 +85,38 @@ export const commentBoxStyles = css`
     border: 1px solid transparent;
   }
   .btn-login-with-github {
-    background: #fff;
-    color: #2563eb;
-    border-color: #2563eb;
+    background: #ffffff;
+    color: #24292f; /* GitHub ink */
+    border-color: #24292f22; /* subtle border */
   }
+
+  .btn-login-with-github:hover {
+    background: #f6f8fa; /* GitHub canvas-subtle */
+    border-color: #24292f55;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05), 0 2px 6px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+  }
+  .btn-login-with-github:active {
+    background: #eef1f4;
+    border-color: #24292f66;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) inset;
+    transform: translateY(0);
+  }
+  .btn-login-with-github:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.35),
+      /* GH blue ring */ 0 1px 1px rgba(0, 0, 0, 0.05),
+      0 2px 6px rgba(0, 0, 0, 0.06);
+    border-color: #0969da; /* GH blue */
+  }
+  .btn-login-with-github:disabled,
+  .btn-login-with-github[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
   .btn-preview:hover {
     background: #f0f9ff;
   }
