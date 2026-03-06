@@ -183,6 +183,7 @@ export class LitTalk extends LitElement {
           code,
           clientId: this.githubOauthOptions.client_id,
           clientSecret: this.githubOauthOptions.client_secret,
+          proxy: this.githubOauthOptions.proxy,
         })
       ),
       Effect.flatMap((response) => {
@@ -227,6 +228,7 @@ export class LitTalk extends LitElement {
 
   override disconnectedCallback() {
     emitter.off(EventTypes.TOKEN_READY);
+    emitter.off(EventTypes.COMMENT_ADDED);
     super.disconnectedCallback();
   }
 

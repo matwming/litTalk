@@ -94,7 +94,6 @@ export class CommentList extends LitElement {
                       class="avatar"
                       src=${comment.user.avatar_url}
                       alt=${comment.user.login}
-                      class="avatar"
                     />
                     <div class="content">
                       <div class="meta">

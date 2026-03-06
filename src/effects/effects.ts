@@ -1,5 +1,5 @@
 import {Effect} from 'effect';
-import {gitHubAccessTokenProxyUrl, gitHubBaseUrl} from '../github/github-apis';
+import {gitHubBaseUrl} from '../github/github-apis';
 import {ACCESS_TOKEN_LOCAL_STORAGE_KEY} from '../constant';
 import {emitter, EventTypes} from '../events';
 
@@ -93,11 +93,11 @@ export const fetchAccessTokenEffect = ({
   code: string;
   clientId: string;
   clientSecret: string;
-  proxy?: string;
+  proxy: string;
 }) => {
   return Effect.tryPromise({
     try: () =>
-      fetch(proxy ?? gitHubAccessTokenProxyUrl, {
+      fetch(proxy, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -16,11 +16,11 @@
   ],
   "exports": {
     ".": {
-      "import": "./dist/lit-talk.js",
-      "require": "./dist/lit-talk.cjs"
+      "import": "./dist/lit-talk.js"
     }
   },
   "scripts": {
+    "prepublishOnly": "pnpm run build",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "clean": "rimraf lit-talk.{d.ts,d.ts.map,js,js.map} test/lit-talk.{d.ts,d.ts.map,js,js.map} test/lit-talk_test.{d.ts,d.ts.map,js,js.map}",

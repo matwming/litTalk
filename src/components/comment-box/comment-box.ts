@@ -57,7 +57,9 @@ export class CommentBox extends LitElement {
         issue: String(this.issueData?.number)!,
         comment: this.commentText,
       })
-    );
+    ).then(() => {
+      this.commentText = '';
+    });
   }
   override render() {
     return commentBoxTemplate(this);
