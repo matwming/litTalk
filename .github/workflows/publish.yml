@@ -79,4 +79,4 @@ jobs:
           npm -v
           echo "OIDC request URL present: ${ACTIONS_ID_TOKEN_REQUEST_URL:+YES}${ACTIONS_ID_TOKEN_REQUEST_URL:-NO}"
           echo "repo: $GITHUB_REPOSITORY  workflow ref: $GITHUB_WORKFLOW_REF"
-          npm publish --ignore-scripts --access public
+          npm publish --ignore-scripts --access public --loglevel verbose 2>&1 | grep -iE "oidc|trusted|provenance|audience|authenticat|registry|token|need auth" | head -40
