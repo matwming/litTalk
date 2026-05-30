@@ -6,12 +6,10 @@
   "observability": {
     "enabled": true
   },
-  "vars": {
-    // GITHUB_CLIENT_ID is the public OAuth App client_id. Safe to commit.
-    // Set ALLOWED_ORIGINS to the site(s) that embed <lit-talk>.
-    "GITHUB_CLIENT_ID": "Ov23lirRECBVNTRxn1N1",
-    "ALLOWED_ORIGINS": "http://localhost:8000"
-  }
-  // GITHUB_CLIENT_SECRET is a secret — set via:
-  //   pnpm wrangler secret put GITHUB_CLIENT_SECRET
+  // Vars (GITHUB_CLIENT_ID, ALLOWED_ORIGINS) are managed in the Cloudflare
+  // dashboard (Worker → Settings → Variables) so they can change without a
+  // redeploy. keep_vars stops `wrangler deploy` from wiping dashboard values.
+  // Local `wrangler dev` reads them from .dev.vars (gitignored).
+  // GITHUB_CLIENT_SECRET (secret): `wrangler secret put GITHUB_CLIENT_SECRET`.
+  "keep_vars": true
 }

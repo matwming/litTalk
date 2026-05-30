@@ -1,2 +1,6 @@
 # Copy to .dev.vars for local `wrangler dev`. NEVER commit .dev.vars.
+# Production values live in the Cloudflare dashboard (wrangler.jsonc uses keep_vars: true);
+# these are only for local development.
+GITHUB_CLIENT_ID="your-oauth-app-client-id"
+ALLOWED_ORIGINS="http://localhost:8000"
 GITHUB_CLIENT_SECRET="your-github-oauth-app-client-secret"
