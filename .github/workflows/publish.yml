@@ -50,11 +50,14 @@ jobs:
             exit 1
           fi
 
-      - name: Install Playwright Chromium
-        run: node "$(node -e "console.log(require.resolve('playwright-core/cli.js'))")" install --with-deps chromium
-
-      - name: Run tests (with 100% coverage gate)
-        run: pnpm test
+      # Browser-based unit tests (@web/test-runner + Playwright/Chromium) are run
+      # locally before releasing — `pnpm test`. Skipped in CI to keep the publish
+      # path free of the Playwright/Chromium dependency.
+      # - name: Install Playwright Chromium
+      #   run: pnpm exec playwright install --with-deps chromium
+      #
+      # - name: Run tests (with 100% coverage gate)
+      #   run: pnpm test
 
       - name: Build (clean → tsc → rollup bundle)
         run: |
