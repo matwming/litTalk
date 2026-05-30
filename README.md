@@ -53,12 +53,28 @@ Required fields:
 - `owner`: GitHub org/user of your repo.
 - `repo`: The repository used for issues/comments.
 - `postUniqueId`: A unique string for the current page/post; used as a label to find/create the related issue.
+- `proxy`: Your server-side OAuth code-exchange endpoint URL. Lit Talk POSTs `{ code, client_id }` to this URL; your proxy is responsible for holding the Client Secret and calling GitHub's `/login/oauth/access_token`, then returning `{ access_token }` to the browser.
 
 Recommended fields:
 - `label`: A general label to group all comment issues (defaults to “LitTalk”).
-- `scope`: Typical scopes are `public_repo read:user` for public repos.
+- `scope`: Typical scopes are `public_repo read:user` for public repos (defaults to `public_repo`).
 - `prompt`: e.g. `consent` to ensure a fresh consent screen.
-- `proxy`: Your OAuth code-exchange endpoint URL.
+- `title`: Title used when Lit Talk auto-creates the issue for a new `postUniqueId` (defaults to `document.title`).
+
+Do NOT pass `client_secret` in `github-oauth-options`. The field is deprecated and ignored as of 1.0.8; the secret must remain server-side in your `proxy`.
+
+### Minimal embed example
+```html
+<lit-talk
+  github-oauth-options='{
+    "client_id": "Iv1.xxxxxxxxxx",
+    "owner": "your-org",
+    "repo": "your-repo",
+    "postUniqueId": "blog-post-123",
+    "proxy": "https://your-site.example.com/api/github/oauth"
+  }'
+></lit-talk>
+```
 
 Test the flow
 - Load your page.

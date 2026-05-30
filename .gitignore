@@ -11,3 +11,8 @@ my-element.d.ts.map
 my-element.bundled.js
 .env
 dist/
+# generated browser bundle (built by rollup; published via package.files)
+lit-talk.bundle.js
+lit-talk.bundle.js.map
+# test coverage output
+coverage/

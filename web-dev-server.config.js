@@ -13,7 +13,9 @@ if (!['dev', 'prod'].includes(mode)) {
 
 export default {
   nodeResolve: {exportConditions: mode === 'dev' ? ['development'] : []},
-  preserveSymlinks: true,
+  // pnpm symlinks node_modules — the resolver must follow symlinks to find
+  // each package's hoisted deps inside .pnpm/.
+  preserveSymlinks: false,
   plugins: [
     legacyPlugin({
       polyfills: {

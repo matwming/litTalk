@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "lit-talk-oauth-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-23",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    // GITHUB_CLIENT_ID is the public OAuth App client_id. Safe to commit.
+    // Set ALLOWED_ORIGINS to the site(s) that embed <lit-talk>.
+    "GITHUB_CLIENT_ID": "Ov23lirRECBVNTRxn1N1",
+    "ALLOWED_ORIGINS": "http://localhost:8000"
+  }
+  // GITHUB_CLIENT_SECRET is a secret — set via:
+  //   pnpm wrangler secret put GITHUB_CLIENT_SECRET
+}

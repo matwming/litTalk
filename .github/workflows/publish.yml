@@ -1,0 +1,69 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+  # Manual override — handy if a release was created but the workflow needs a re-run.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v1.0.8). Leave blank to use the current ref.'
+        required: false
+
+permissions:
+  contents: read
+  # Required for npm provenance attestations (sigstore via GitHub OIDC).
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Check out the tag, not the default branch, so we publish what was released.
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify package.json version matches release tag
+        if: github.event_name == 'release'
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          # Strip leading "v" from the release tag if present.
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "package.json: $PKG_VERSION"
+          echo "release tag : $TAG_VERSION"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::package.json version ($PKG_VERSION) does not match release tag ($TAG_VERSION)."
+            exit 1
+          fi
+
+      - name: Install Playwright Chromium
+        run: node "$(node -e "console.log(require.resolve('playwright-core/cli.js'))")" install --with-deps chromium
+
+      - name: Run tests (with 100% coverage gate)
+        run: pnpm test
+
+      - name: Build (clean → tsc → rollup bundle)
+        run: |
+          pnpm run clean
+          pnpm run build
+          pnpm run build:bundle
+
+      # `--ignore-scripts` skips prepublishOnly (we already built explicitly above).
+      - name: Publish to npm with provenance
+        run: pnpm publish --no-git-checks --ignore-scripts --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

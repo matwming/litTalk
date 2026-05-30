@@ -1,6 +1,6 @@
-// comment-box.ts
 import {LitElement, html, css} from 'lit';
 import {customElement, property} from 'lit/decorators.js';
+import {DEFAULT_GITHUB_AVATAR_URL} from '../../constant';
 
 @customElement('comment-list')
 export class CommentList extends LitElement {
@@ -46,6 +46,8 @@ export class CommentList extends LitElement {
       font-size: 16px;
       color: #333;
       margin: 4px 0 8px 0;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
     .actions {
       font-size: 14px;
@@ -74,42 +76,55 @@ export class CommentList extends LitElement {
   `;
 
   @property({type: Array})
-  comments: any[] = [];
+  comments: GitHubComment[] = [];
 
   override render() {
     return html`
       <div class="comment-container">
         ${this.comments.length > 0
           ? html`<div class="comment-count">
-              ${this.comments.length} comments
+              ${this.comments.length}
+              ${this.comments.length === 1 ? 'comment' : 'comments'}
             </div>`
           : html``}
         ${this.comments.length === 0
           ? html`<p class="no-comments">No comments yet.</p>`
           : html`
-              ${this.comments.map(
-                (comment: any) => html`
+              ${this.comments.map((comment) => {
+                const login = comment.user?.login ?? 'ghost';
+                const avatar =
+                  comment.user?.avatar_url ?? DEFAULT_GITHUB_AVATAR_URL;
+                const userUrl = comment.user?.html_url;
+                const createdAt = comment.created_at
+                  ? new Date(comment.created_at)
+                  : undefined;
+                return html`
                   <div class="comment-section">
-                    <img
-                      class="avatar"
-                      src=${comment.user.avatar_url}
-                      alt=${comment.user.login}
-                    />
+                    <img class="avatar" src=${avatar} alt=${login} />
                     <div class="content">
                       <div class="meta">
-                        <a class="username" href="#">${comment.user.login}</a>
+                        ${userUrl
+                          ? html`<a
+                              class="username"
+                              href=${userUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              >${login}</a
+                            >`
+                          : html`<span class="username">${login}</span>`}
                         commented
-                        ${new Date(comment.created_at).toLocaleDateString()} at
-                        ${new Date(comment.created_at).toLocaleTimeString()}
+                        ${createdAt
+                          ? html`<time datetime=${comment.created_at}
+                              >${createdAt.toLocaleDateString()} at
+                              ${createdAt.toLocaleTimeString()}</time
+                            >`
+                          : ''}
                       </div>
                       <div class="text">${comment.body}</div>
-                      <!--              <div class="actions">-->
-                      <!--                <div class="icon">❤️ <span>3</span></div>-->
-                      <!--              </div>-->
                     </div>
                   </div>
-                `
-              )}
+                `;
+              })}
             `}
       </div>
     `;

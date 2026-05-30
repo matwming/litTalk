@@ -2,20 +2,25 @@ import {LitElement, html} from 'lit';
 import {customElement, property, state} from 'lit/decorators.js';
 import './components/comment-box/comment-box';
 import './components/comment-list/comment-list';
-import {Effect, Console} from 'effect';
 import {
-  createIssueEffect,
-  fetchAccessTokenEffect,
-  fetchUserInfoEffect,
-  findIssueByLabelsEffect,
-  findIssueCommentsEffect,
-} from './effects/effects';
-import {ACCESS_TOKEN_LOCAL_STORAGE_KEY} from './constant';
-import {emitter, EventTypes} from './events';
+  createIssue,
+  fetchAccessToken,
+  fetchUserInfo,
+  findIssueByLabels,
+  findIssueComments,
+} from './github/api';
+import {
+  ACCESS_TOKEN_LOCAL_STORAGE_KEY,
+  OAUTH_STATE_STORAGE_KEY,
+} from './constant';
 
 export interface IGitHubOauthOptions {
   client_id: string;
-  client_secret: string;
+  /**
+   * @deprecated Do not pass the OAuth Client Secret to the browser. The
+   * consumer's `proxy` endpoint must hold the secret server-side.
+   */
+  client_secret?: string;
   repo: string;
   owner: string;
   label: string;
@@ -34,25 +39,22 @@ export class LitTalk extends LitElement {
     attribute: 'github-oauth-options',
     converter: {
       fromAttribute: (value) => {
-        if (value) {
-          try {
-            const result = JSON.parse(value);
-            if (!result.postUniqueId) {
-              throw new Error('postUniqueId is required for tagging purposes');
-            }
-            return result;
-          } catch (e) {
-            console.error('Invalid JSON in github-oauth-options attribute', e);
-            return {};
+        if (!value) return {};
+        try {
+          const result = JSON.parse(value);
+          if (!result.postUniqueId) {
+            throw new Error('postUniqueId is required for tagging purposes');
           }
+          return result;
+        } catch (e) {
+          console.error('Invalid JSON in github-oauth-options attribute', e);
+          return {};
         }
-        return undefined;
       },
     },
   })
   githubOauthOptions: IGitHubOauthOptions = {
     client_id: '',
-    client_secret: '',
     repo: '',
     owner: '',
     label: '',
@@ -60,7 +62,7 @@ export class LitTalk extends LitElement {
     scope: '',
     prompt: '',
     proxy: '',
-    postUniqueId: '', // The unique id of each post. Used for the tag in the github issue.
+    postUniqueId: '',
   };
 
   @state()
@@ -82,260 +84,207 @@ export class LitTalk extends LitElement {
   error?: string;
 
   @state()
-  commentLists: any[] = [];
+  commentLists: GitHubComment[] = [];
+
+  private _validateOptions(): string | undefined {
+    const {client_id, owner, repo, postUniqueId} = this.githubOauthOptions;
+    const missing = [
+      !client_id && 'client_id',
+      !owner && 'owner',
+      !repo && 'repo',
+      !postUniqueId && 'postUniqueId',
+    ].filter(Boolean);
+    if (missing.length) {
+      return `Missing required github-oauth-options: ${missing.join(', ')}`;
+    }
+    return undefined;
+  }
 
   override connectedCallback() {
     super.connectedCallback();
 
-    emitter.on(EventTypes.TOKEN_READY, () => {
-      Effect.runPromise(
-        this.runInitEffect({
-          owner: this.githubOauthOptions.owner,
-          repo: this.githubOauthOptions.repo,
-          labels: {
-            label: this.githubOauthOptions.label || this.defaultLabel,
-            postId: this.githubOauthOptions.postUniqueId as string,
-          },
-        })
-      ).catch((error) => {
-        console.error('Error executing initEffect:', error);
-      });
-    });
+    const validationError = this._validateOptions();
+    if (validationError) {
+      this.error = validationError;
+      return;
+    }
 
-    emitter.on(EventTypes.COMMENT_ADDED, () => {
-      Effect.runPromise(
-        this.fetchCommentsEffect({issueId: String(this.theIssueData?.number)})
-      );
-    });
-
-    console.log('options', this.githubOauthOptions);
-
-    // Check for code in URL when component connects to DOM
     const urlParams = new URLSearchParams(window.location.search);
     this.githubOauthCode = urlParams.get('code') || undefined;
+    const returnedState = urlParams.get('state') || undefined;
 
-    // If code exists, exchange it for an access token (which includes fetching comments)
     if (this.githubOauthCode) {
+      // Verify CSRF state — fail closed. An unsolicited callback (missing
+      // stored state) is just as suspicious as a mismatched one: in either
+      // case the user did not start this login from this widget.
+      const expectedState = sessionStorage.getItem(OAUTH_STATE_STORAGE_KEY);
+      sessionStorage.removeItem(OAUTH_STATE_STORAGE_KEY);
+      if (!expectedState || expectedState !== returnedState) {
+        this.error = 'OAuth state mismatch — possible CSRF. Login aborted.';
+        this.githubOauthCode = undefined;
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname + window.location.hash
+        );
+        return;
+      }
       this.exchangeCodeForToken(this.githubOauthCode);
-    }
-    // If no code but we have a stored access token, just fetch comments
-    else {
+    } else {
       const storedToken = localStorage.getItem(ACCESS_TOKEN_LOCAL_STORAGE_KEY);
       if (storedToken) {
         this.accessToken = storedToken;
-        emitter.emit(EventTypes.TOKEN_READY, storedToken);
+        void this.runInit();
       }
     }
   }
 
   exchangeCodeForToken(code: string) {
-    // Run the effect
-    Effect.runPromise(this.fetchTokenEffect(code)).catch((error) => {
-      console.error('Error exchanging code for token:', error);
-    });
+    void this.runTokenExchange(code);
   }
 
-  private fetchCommentsEffect({issueId}: {issueId: string} = {issueId: '1'}) {
-    return Effect.sync(() => {
-      this.isLoading = true;
-    }).pipe(
-      Effect.flatMap(() =>
-        findIssueCommentsEffect({
-          owner: this.githubOauthOptions.owner,
-          repo: this.githubOauthOptions.repo,
-          issue: issueId,
-        })
-      ),
-      Effect.flatMap((response) => {
-        return Effect.tryPromise({
-          try: () => response.json(),
-          catch: () => new Error('Invalid response format'),
-        });
-      }),
-      Effect.tap((data) => {
-        if (data.message === 'Bad credentials') {
-          this.error = data.message;
+  private _onCommentAdded(): void {
+    const issueNumber = this.theIssueData?.number;
+    if (issueNumber == null) return;
+    void this.loadComments(String(issueNumber));
+  }
+
+  private async loadComments(issueId: string): Promise<void> {
+    this.isLoading = true;
+    try {
+      const response = await findIssueComments({
+        owner: this.githubOauthOptions.owner,
+        repo: this.githubOauthOptions.repo,
+        issue: issueId,
+      });
+      const data: GitHubComment[] | GitHubErrorResponse = await response.json();
+
+      if (!Array.isArray(data)) {
+        if (data?.message === 'Bad credentials') {
           localStorage.removeItem(ACCESS_TOKEN_LOCAL_STORAGE_KEY);
+          this.accessToken = undefined;
+          this.githubUser = undefined;
         }
-        this.commentLists = data;
-      }),
-      Effect.tap(() => {
-        this.isLoading = false;
-      }),
-      Effect.tapError((err) => {
-        this.error = err.message;
-        return Console.log('error', err.message);
-      }),
-      Effect.onError(() =>
-        Effect.sync(() => {
-          this.isLoading = false;
-        })
-      )
-    );
+        this.error = data?.message ?? 'Unexpected response from GitHub';
+        this.commentLists = [];
+        return;
+      }
+      this.error = undefined;
+      this.commentLists = data;
+    } catch (err) {
+      this.error = err instanceof Error ? err.message : String(err);
+    } finally {
+      this.isLoading = false;
+    }
   }
 
-  private fetchTokenEffect(code: string) {
-    return Effect.sync(() => {
-      this.isLoading = true;
-    }).pipe(
-      Effect.flatMap(() =>
-        fetchAccessTokenEffect({
-          code,
-          clientId: this.githubOauthOptions.client_id,
-          clientSecret: this.githubOauthOptions.client_secret,
-          proxy: this.githubOauthOptions.proxy,
-        })
-      ),
-      Effect.flatMap((response) => {
-        console.log('response', response);
+  private async runTokenExchange(code: string): Promise<void> {
+    this.isLoading = true;
+    try {
+      const response = await fetchAccessToken({
+        code,
+        clientId: this.githubOauthOptions.client_id,
+        proxy: this.githubOauthOptions.proxy,
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to exchange code: ${response.statusText}`);
+      }
+      const data: {access_token?: string; error?: string} = await response.json();
+      if (!data.access_token) {
+        throw new Error(data.error || 'No access_token in proxy response');
+      }
+      this.accessToken = data.access_token;
+      // Preserve the hash so consumers using hash-based routing aren't broken.
+      window.history.replaceState(
+        {},
+        document.title,
+        window.location.pathname + window.location.hash
+      );
+      localStorage.setItem(ACCESS_TOKEN_LOCAL_STORAGE_KEY, data.access_token);
+      await this.runInit();
+    } catch (err) {
+      this.error = err instanceof Error ? err.message : String(err);
+    } finally {
+      this.isLoading = false;
+    }
+  }
 
-        if (!response.ok) {
-          return Effect.fail(
-            new Error(`Failed to exchange code: ${response.statusText}`)
-          );
-        }
+  private async runInit(): Promise<void> {
+    this.isLoading = true;
+    try {
+      const {owner, repo} = this.githubOauthOptions;
+      const labels = {
+        label: this.githubOauthOptions.label || this.defaultLabel,
+        postId: this.githubOauthOptions.postUniqueId,
+      };
 
-        return Effect.tryPromise({
-          try: () => response.json(),
-          catch: () => new Error('Invalid response format'),
-        });
-      }),
-      Effect.tap((data) => {
-        console.log('data', data);
-        this.accessToken = data.access_token;
-        window.history.replaceState(
-          {},
-          document.title,
-          window.location.pathname
+      // 1. Fetch the authenticated user.
+      const userResponse = await fetchUserInfo();
+      const userData: GitHubUser | GitHubErrorResponse = await userResponse.json();
+      if ((userData as GitHubErrorResponse).message === 'Bad credentials') {
+        localStorage.removeItem(ACCESS_TOKEN_LOCAL_STORAGE_KEY);
+        this.accessToken = undefined;
+        this.githubUser = undefined;
+        throw new Error('Stored token rejected by GitHub — please log in again.');
+      }
+      this.githubUser = userData as GitHubUser;
+
+      // 2. Look up the issue for this post by labels.
+      const issueResponse = await findIssueByLabels({owner, repo, labels});
+      const issueData: GitHubIssueData[] | GitHubErrorResponse =
+        await issueResponse.json();
+      if (!Array.isArray(issueData)) {
+        throw new Error(
+          (issueData as GitHubErrorResponse).message ||
+            'Unexpected issue lookup response'
         );
-        localStorage.setItem(ACCESS_TOKEN_LOCAL_STORAGE_KEY, data.access_token);
-        emitter.emit(EventTypes.TOKEN_READY, data.access_token);
-      }),
-      Effect.tap(() => {
-        this.isLoading = false;
-      }),
-      Effect.tapError((err) => {
-        this.error = err.message;
-        return Console.log('error', err.message);
-      }),
-      Effect.onError(() =>
-        Effect.sync(() => {
-          this.isLoading = false;
-        })
-      )
-    );
-  }
+      }
+      this.theIssueData = issueData[0];
 
-  override disconnectedCallback() {
-    emitter.off(EventTypes.TOKEN_READY);
-    emitter.off(EventTypes.COMMENT_ADDED);
-    super.disconnectedCallback();
-  }
-
-  private runInitEffect = ({
-    owner,
-    repo,
-    labels,
-  }: {
-    owner: string;
-    repo: string;
-    labels: {
-      postId: string;
-      label: string;
-    };
-  }) => {
-    return Effect.sync(() => {
-      // Initialize any needed state
-      this.isLoading = true;
-      console.log('initEffect', labels);
-    }).pipe(
-      // First: Fetch user info
-      Effect.flatMap(() => fetchUserInfoEffect()),
-      Effect.flatMap((userResponse) =>
-        Effect.tryPromise({
-          try: () => userResponse.json(),
-          catch: (error) =>
-            new Error(`Failed to parse user data: ${String(error)}`),
-        }).pipe(
-          Effect.tap((userData) => {
-            this.githubUser = userData;
-          })
-        )
-      ),
-
-      // Second: Find issue by labels
-      Effect.flatMap((userData) =>
-        findIssueByLabelsEffect({owner, repo, labels}).pipe(
-          Effect.map((issueResponse) => ({userData, issueResponse}))
-        )
-      ),
-      Effect.flatMap(({userData, issueResponse}) =>
-        Effect.tryPromise({
-          try: () => issueResponse.json(),
-          catch: (error) =>
-            new Error(`Failed to parse issue data: ${String(error)}`),
-        }).pipe(
-          Effect.map((issueData) => {
-            console.log({userData, issueData});
-            return {userData, issueData};
-          }),
-          Effect.tap(({issueData}) => {
-            this.theIssueData = issueData[0];
-            //this.githubUser = userData;
-          })
-        )
-      ),
-      // Third: Find comments for the found issue
-      Effect.flatMap(({issueData}) => {
-        if (!this.theIssueData) {
-          console.log('No issue found, creating one...');
-
-          return createIssueEffect({
-            owner: this.githubOauthOptions.owner,
-            repo: this.githubOauthOptions.repo,
-            title:
-              document.title || `Discussion for ${window.location.pathname}`,
-            labels: [
-              this.githubOauthOptions.label || this.defaultLabel,
-              this.githubOauthOptions.postUniqueId,
-            ],
-            body: `This issue was automatically created for the page: ${window.location.href}`,
-          }).pipe(
-            // After creating the issue, parse the response
-            Effect.flatMap((response) =>
-              Effect.tryPromise({
-                try: () => response.json(),
-                catch: (error) =>
-                  new Error(`Failed to parse created issue: ${String(error)}`),
-              })
-            ),
-            // Save the newly created issue
-            Effect.tap((newIssue) => {
-              console.log('Created new issue:', newIssue);
-              this.theIssueData = newIssue;
-              // Now that we have a new issue, we don't need to fetch comments yet (it's new)
-              this.commentLists = [];
-              this.isLoading = false;
-            })
+      // 3. Either fetch comments or create the issue if it doesn't exist yet.
+      if (!this.theIssueData) {
+        const createResponse = await createIssue({
+          owner,
+          repo,
+          title:
+            this.githubOauthOptions.title ||
+            document.title ||
+            `Discussion for ${window.location.pathname}`,
+          labels: [
+            this.githubOauthOptions.label || this.defaultLabel,
+            this.githubOauthOptions.postUniqueId,
+          ],
+          body: `This issue was automatically created for the page: ${window.location.href}`,
+        });
+        const parsed: GitHubIssueData | GitHubErrorResponse =
+          await createResponse.json();
+        if (!createResponse.ok) {
+          throw new Error(
+            (parsed as GitHubErrorResponse)?.message ||
+              `Failed to create issue (HTTP ${createResponse.status}).`
           );
         }
+        const newIssue = parsed as GitHubIssueData;
+        if (typeof newIssue?.number !== 'number') {
+          throw new Error('Issue creation returned an unexpected payload.');
+        }
+        this.theIssueData = newIssue;
+        this.commentLists = [];
+      } else {
+        await this.loadComments(this.theIssueData.number.toString());
+      }
+    } catch (err) {
+      this.error = err instanceof Error ? err.message : String(err);
+      console.error('Init error:', err);
+    } finally {
+      this.isLoading = false;
+    }
+  }
 
-        // Get the first issue number
-        const issueNumber = issueData[0].number.toString();
-
-        return this.fetchCommentsEffect({issueId: issueNumber});
-      }),
-
-      // Handle errors throughout the chain
-      Effect.tapError((error) =>
-        Effect.sync(() => console.error('Init effect error:', error))
-      )
-    );
-  };
   override render() {
     if (this.isLoading) {
       return html`
-        <div class="loading-container">
+        <div class="loading-container" role="status" aria-live="polite">
           <div class="loading-spinner"></div>
           <div class="loading-text">Loading...</div>
         </div>
@@ -343,7 +292,7 @@ export class LitTalk extends LitElement {
     }
     if (this.error) {
       return html`
-        <div class="error-container">
+        <div class="error-container" role="alert">
           <div class="error-icon">⚠️</div>
           <div class="error-message">Error: ${this.error}</div>
         </div>
@@ -355,6 +304,7 @@ export class LitTalk extends LitElement {
         .options=${this.githubOauthOptions}
         .githubUser=${this.githubUser}
         .issueData=${this.theIssueData}
+        @comment-added=${this._onCommentAdded}
       ></comment-box>
       <comment-list .comments=${this.commentLists}></comment-list>
     `;
@@ -364,5 +314,8 @@ export class LitTalk extends LitElement {
 declare global {
   interface HTMLElementTagNameMap {
     'lit-talk': LitTalk;
+  }
+  interface HTMLElementEventMap {
+    'comment-added': CustomEvent<void>;
   }
 }

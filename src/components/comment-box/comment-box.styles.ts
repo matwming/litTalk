@@ -124,7 +124,38 @@ export const commentBoxStyles = css`
     background: #2563eb;
     color: #fff;
   }
-  .btn-comment:hover {
+  .btn-comment:hover:not(:disabled) {
     background: #1e40af;
+  }
+  .btn-comment:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .comment-textarea:disabled {
+    background: #f6f6f6;
+    cursor: not-allowed;
+  }
+
+  .post-error {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 `;

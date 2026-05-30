@@ -74,6 +74,24 @@ type GitHubIssueData = {
   state_reason: null | string;
 };
 
+type GitHubComment = {
+  id: number;
+  node_id: string;
+  url: string;
+  html_url: string;
+  body: string;
+  user: GitHubUser | null;
+  created_at: string;
+  updated_at: string;
+  author_association: string;
+};
+
+type GitHubErrorResponse = {
+  message: string;
+  documentation_url?: string;
+  status?: string;
+};
+
 type GitHubUser = {
   login: string;
   id: number;
