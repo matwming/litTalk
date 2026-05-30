@@ -77,4 +77,6 @@ jobs:
         run: |
           node -v
           npm -v
+          echo "OIDC request URL present: ${ACTIONS_ID_TOKEN_REQUEST_URL:+YES}${ACTIONS_ID_TOKEN_REQUEST_URL:-NO}"
+          echo "repo: $GITHUB_REPOSITORY  workflow ref: $GITHUB_WORKFLOW_REF"
           npm publish --ignore-scripts --access public
