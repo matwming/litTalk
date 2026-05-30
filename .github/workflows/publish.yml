@@ -28,10 +28,12 @@ jobs:
         with:
           version: 10
 
+      # NOTE: no `registry-url` — it would write an .npmrc with a placeholder
+      # auth token and set NODE_AUTH_TOKEN, making npm use (bogus) token auth
+      # instead of OIDC. Trusted publishing needs NO token configured.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          registry-url: 'https://registry.npmjs.org'
           cache: pnpm
 
       - name: Upgrade npm (trusted publishing needs npm >= 11.5.1)
