@@ -3,6 +3,10 @@
   "private": false,
   "version": "2.0.0",
   "homepage": "https://github.com/quiet-build/litTalk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quiet-build/litTalk.git"
+  },
   "description": "A lightweight GitHub-powered comment system for any JavaScript framework. Built with Lit web components.",
   "main": "./dist/lit-talk.js",
   "module": "./dist/lit-talk.js",
