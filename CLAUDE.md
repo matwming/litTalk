@@ -112,6 +112,9 @@ payload-shape validation), then fetches comments. New comments post via
   for genuine errors only.
 - **Match existing style** (single quotes, 2-space indent, trailing commas).
   Prettier config at `.prettierrc.json`.
+- **Keep companion docs current.** When changing source, worker, build, or test
+  files, update `docs/source-map.md` if responsibilities, public behavior,
+  security invariants, or maintenance rules change.
 
 ## Release process
 
